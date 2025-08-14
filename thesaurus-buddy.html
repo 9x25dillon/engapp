@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thesaurus Buddy — Live Focus Cursor</title>
+  <style>
+    :root{
+      --bg:#0f1220;--panel:#171a2c;--ink:#eceff6;--muted:#a9b1d6;--accent:#7aa2f7;--accent2:#9ece6a;--danger:#f7768e;--shadow:rgba(0,0,0,.35)
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:linear-gradient(180deg,#0e1020,#090c17);color:var(--ink)}
+    .wrap{max-width:1200px;margin:0 auto;padding:24px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.3px}
+    .hint{color:var(--muted);font-size:12px}
+    .grid{display:grid;grid-template-columns:1fr 440px;gap:16px}
+    .card{background:var(--panel);border:1px solid #22263e;border-radius:16px;box-shadow:0 8px 40px var(--shadow)}
+    .card h2{margin:0;padding:14px 16px;border-bottom:1px solid #22263e;font-size:14px;letter-spacing:.3px;color:var(--muted)}
+
+    /* editor + overlay */
+    .editor-wrap{position:relative}
+    textarea#editor{
+      position:relative;z-index:2;width:100%;height:52vh;resize:vertical;
+      background:transparent;color:transparent;caret-color:#c7d2ff;border:0;border-radius:16px;
+      padding:14px 16px;font-size:16px;line-height:1.6;tab-size:2;will-change:scroll-position
+    }
+    pre#overlay{
+      position:absolute;inset:0;z-index:1;margin:0;border-radius:16px;padding:14px 16px;
+      font-size:16px;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;overflow:auto;
+      background:#0b0f20;color:var(--ink);will-change:scroll-position
+    }
+    pre#overlay .focus-sent{
+      background:linear-gradient(90deg,rgba(122,162,247,.15),rgba(158,206,106,.12));
+      border-radius:6px;padding:0 .5px
+    }
+    pre#overlay .focus-word{background:rgba(122,162,247,.35);border-radius:4px}
+
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid #22263e}
+    .btn{background:#101427;border:1px solid #22263e;color:var(--ink);padding:8px 10px;border-radius:10px;cursor:pointer}
+    .btn.small{font-size:12px;padding:6px 8px}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+
+    .search-bar{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid #22263e}
+    .search-input{flex:1;background:#0b0f20;border:1px solid #22263e;border-radius:10px;color:var(--ink);padding:10px 10px}
+
+    .panel{padding:10px 12px 14px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:999px;border:1px solid #2a315a;background:#11162a;cursor:pointer}
+    .pos{font-size:10px;border:1px solid #344; padding:2px 6px;border-radius:999px;color:#a7b0d4}
+    .meta{font-size:11px;color:var(--muted)}
+    .empty{color:var(--muted);font-size:14px;padding:8px}
+
+    .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+    .kpi .tile{background:#0d1326;border:1px solid #22263e;border-radius:10px;padding:8px}
+    .kpi .tile h4{margin:0 0 4px 0;font-size:12px;color:var(--muted)}
+    .kpi .tile .v{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .halo{display:inline-flex;align-items:center;gap:8px}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 14px 3px rgba(122,162,247,.65)}
+
+    .replace-bar{display:flex;gap:8px;align-items:center;padding:10px 12px;border-top:1px solid #22263e}
+    .replace-bar input{flex:1;background:#0b0f20;border:1px solid #22263e;border-radius:10px;color:var(--ink);padding:8px 10px}
+    .footer{margin-top:6px;color:var(--muted);font-size:12px}
+    
+    /* Responsive layout */
+    @media (max-width: 900px){ 
+      .grid{ grid-template-columns:1fr; } 
+      textarea#editor{ height:38vh; } 
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🧠 Thesaurus Buddy · Live-Focus Cursor</h1>
+      <div id="helper" class="hint">Live-tracking fragments + context aura. Select a word or just type.</div>
+    </header>
+
+    <div class="grid">
+      <section class="card" aria-label="Editor">
+        <h2>Essay (live focus)</h2>
+        <div class="editor-wrap">
+          <pre id="overlay" aria-hidden="true"></pre>
+          <textarea id="editor" spellcheck="false"></textarea>
+        </div>
+        <div class="toolbar">
+          <button class="btn small" id="btnWeak">Flag weak words</button>
+          <button class="btn small" id="btnUndo" disabled>Undo</button>
+          <span class="halo"><span class="dot" id="presenceDot"></span><span class="hint">AI focus on current sentence</span></span>
+        </div>
+      </section>
+
+      <aside class="card" aria-label="Thesaurus & Focus Intelligence">
+        <h2>Focus Intelligence</h2>
+        <div class="search-bar">
+          <input class="search-input" id="word" autocomplete="off" placeholder="Word/fragment (auto from cursor)…" aria-label="Search word or fragment" aria-describedby="helper" />
+          <button class="btn" id="lookup">Look up</button>
+        </div>
+        <div class="panel">
+          <div class="kpi">
+            <div class="tile"><h4>Fragment</h4><div class="v" id="kFrag">—</div></div>
+            <div class="tile"><h4>POS guess</h4><div class="v" id="kPOS">—</div></div>
+            <div class="tile"><h4>Sentence len</h4><div class="v" id="kLen">0</div></div>
+          </div>
+
+          <div class="chips" id="results" role="list" aria-live="polite"></div>
+
+          <div class="replace-bar">
+            <input id="preview" autocomplete="off" placeholder="Replacement preview" aria-label="Replacement preview" />
+            <button class="btn" id="apply">Apply</button>
+          </div>
+
+          <div class="footer">Datamuse API + in-browser heuristics (no login). Topic tags below are inferred locally.</div>
+
+          <div class="chips" id="topics"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const editor = document.getElementById('editor');
+    const overlay = document.getElementById('overlay');
+    const wordInput = document.getElementById('word');
+    const results = document.getElementById('results');
+    const preview = document.getElementById('preview');
+    const applyBtn = document.getElementById('apply');
+    const presenceDot = document.getElementById('presenceDot');
+    const topics = document.getElementById('topics');
+    const kFrag = document.getElementById('kFrag');
+    const kPOS = document.getElementById('kPOS');
+    const kLen = document.getElementById('kLen');
+
+    const history = [];
+    const MAX_HISTORY = 100; // Cap memory usage
+
+    // Weak words lists - separate single and multi-word phrases
+    const WEAK_SINGLE = new Set(['very','really','stuff','things','basically','literally','just']);
+    const WEAK_MULTI = [/\bkind\s+of\b/giu, /\bsort\s+of\b/giu, /\ba\s+lot\b/giu, /\bin\s+fact\b/giu, /\byou\s+know\b/giu, /\bi\s+mean\b/giu];
+
+    // Detect Unicode property escapes support (legacy fallback)
+    const hasUnicodeSupport = (() => {
+      try { return /\p{L}/u.test('a'); } catch { return false; }
+    })();
+
+    // Unified "word" character class (letters, numbers, apostrophes, hyphen & common dashes)
+    const WORD_CLASS = hasUnicodeSupport
+      ? "\\p{L}\\p{N}'\\u2019\\u2010\\u2011\\u2012\\u2013\\u2014-"
+      : "a-zA-Z0-9'\\u2019\\u2010\\u2011\\u2012\\u2013\\u2014-";
+    const WORD_RE = new RegExp(`[${WORD_CLASS}]`, hasUnicodeSupport ? 'u' : '');
+    const WB = `[^${WORD_CLASS}]`; // boundary built from the same class
+
+    // Debounce and AbortController for lookups
+    let lookupTimeout = null;
+    let currentController = null;
+    let latestToken = 0;
+
+    // IME/composition safety
+    let composing = false;
+
+    // Topic extraction perf cache
+    const topicCache = new Map();
+    let topicTimeout = null;
+
+    // Network retry (for 429/flaky networks)
+    const MAX_RETRIES = 3;
+    const RETRY_DELAYS = [1000, 2000, 4000];
+
+    // Stopwords cache
+    const STOPWORDS = new Set('the a an and or but if is are was were be been being i me my we our you your he she it they them of to in for on with at from by as that this these those not no yes do does did done have has had can could should would may might will shall than then so such into over under again further more most each few other some'.split(/\s+/));
+
+    // Keyword regex reused from WORD_CLASS
+    const KEYWORD_RE = new RegExp(`[${WORD_CLASS}]+`, hasUnicodeSupport ? 'gu' : 'g');
+
+    function topKeywords(text, n=6){
+      const counts = new Map();
+      for (const raw of text.toLowerCase().match(KEYWORD_RE) || []) {
+        if (STOPWORDS.has(raw) || raw.length < 3) continue;
+        counts.set(raw, (counts.get(raw)||0) + 1);
+      }
+      return [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,n).map(([w])=>w);
+    }
+
+    // Render overlay with focus highlighting
+    function renderOverlay(){
+      const v = editor.value;
+      const pos = caretPosSafe(editor);
+      const {sentStart, sentEnd} = currentSentenceBounds(v, pos);
+
+      const beforeText = v.slice(0, sentStart);
+      const focusText = v.slice(sentStart, sentEnd);
+      const afterText = v.slice(sentEnd);
+
+      const frag = currentFragment(v, pos);
+
+      let focusHTML = '';
+      if(frag.word){
+        const relStart = Math.max(0, Math.min(frag.start - sentStart, focusText.length));
+        const relEnd = Math.max(0, Math.min(frag.end - sentStart, focusText.length));
+        focusHTML =
+          escapeHTML(focusText.slice(0, relStart)) +
+          '<span class="focus-word">' + escapeHTML(focusText.slice(relStart, relEnd)) + '</span>' +
+          escapeHTML(focusText.slice(relEnd));
+      } else {
+        focusHTML = escapeHTML(focusText);
+      }
+
+      overlay.innerHTML =
+        escapeHTML(beforeText) +
+        '<span class="focus-sent">' + focusHTML + '</span>' +
+        escapeHTML(afterText);
+
+      // KPIs
+      kFrag.textContent = frag.word || '—';
+      kPOS.textContent = guessPOS(frag.word) || '—';
+      const wc = focusText.trim() ? focusText.trim().split(/\s+/).filter(Boolean).length : 0;
+      kLen.textContent = wc;
+
+      // Topics (debounced + idle)
+      if(topicTimeout) clearTimeout(topicTimeout);
+      topicTimeout = setTimeout(() => {
+        const hash = v.length > 100 ? v.slice(0, 100) + '...' + v.length : v;
+        if(topicCache.has(hash)) {
+          topics.innerHTML = topicCache.get(hash);
+        } else {
+          const computeTopics = () => {
+            if(!topics.querySelector('.chip')) {
+              topics.innerHTML = '<span class="empty">Computing topics...</span>';
+            }
+            const keywords = topKeywords(v);
+            let html = '';
+            for(const kw of keywords){ html += `<span class="chip">#${kw}</span>`; }
+            topics.innerHTML = html;
+            topicCache.set(hash, html);
+            if(topicCache.size > 20) {
+              const firstKey = topicCache.keys().next().value;
+              topicCache.delete(firstKey);
+            }
+          };
+          if(window.requestIdleCallback){
+            requestIdleCallback(computeTopics, { timeout: 1000 });
+          } else {
+            computeTopics();
+          }
+        }
+      }, 100);
+
+      // Presence pulse
+      presenceDot.style.boxShadow = '0 0 14px 3px rgba(122,162,247,.65)';
+      setTimeout(()=> presenceDot.style.boxShadow = '0 0 10px 2px rgba(122,162,247,.45)', 120);
+    }
+
+    function currentSentenceBounds(text, index){
+      const left = text.slice(0, index);
+      const right = text.slice(index);
+      const start = Math.max(0, left.lastIndexOf('.')+1, left.lastIndexOf('!')+1, left.lastIndexOf('?')+1, left.lastIndexOf('\n')+1);
+      let end = right.search(/[.!?\n]/);
+      if(end === -1) end = text.length; else end = index + end + 1;
+      return {sentStart: start, sentEnd: end};
+    }
+
+    function currentFragment(text, index){
+      let s = index, e = index;
+      while (s > 0 && WORD_RE.test(text[s-1])) s--;
+      while (e < text.length && WORD_RE.test(text[e])) e++;
+      const word = text.slice(s, e);
+      return { word, start: s, end: e };
+    }
+
+    function guessPOS(w){
+      if(!w) return '';
+      if(/ly$/i.test(w)) return 'adverb?';
+      if(/(ing|ed)$/i.test(w)) return 'verb?';
+      if(/(ous|ful|able|ible|al|ive|ic|ish|less|y)$/i.test(w)) return 'adjective?';
+      return 'unknown';
+    }
+
+    function escapeRegExp(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+    function escapeHTML(s){
+      return s.replace(/[&<>"'`]/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'
+      }[c]));
+    }
+
+    // Caret safety (Safari when not focused)
+    function caretPosSafe(el){ return (el.selectionStart==null ? (el.value||'').length : el.selectionStart); }
+
+    // Datamuse helpers with AbortController + retry
+    async function datamuse(params, controller, attempt = 0){
+      try {
+        const url = new URL('https://api.datamuse.com/words');
+        Object.entries(params).forEach(([k,v])=> url.searchParams.set(k, v));
+        const res = await fetch(url, { signal: controller.signal });
+
+        if(!res.ok) {
+          if(res.status === 429 && attempt < MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+            return datamuse(params, controller, attempt + 1);
+          }
+          throw new Error(`Datamuse request failed: ${res.status} ${res.statusText}`);
+        }
+        return res.json();
+      } catch(e) {
+        if(e.name === 'AbortError') throw e;
+        if(attempt < MAX_RETRIES){
+          await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+          return datamuse(params, controller, attempt + 1);
+        }
+        throw e;
+      }
+    }
+
+    function setBusy(b){ results.setAttribute('aria-busy', b ? 'true' : 'false'); }
+
+    async function lookup(q, fragMode=false){
+      if(currentController) currentController.abort();
+      currentController = new AbortController();
+      const token = ++latestToken;
+
+      setBusy(true);
+      results.textContent = 'Searching…';
+
+      try{
+        const tasks = [];
+        if(fragMode){
+          tasks.push(datamuse({sp: q.toLowerCase() + '*', md:'p'}, currentController));
+        } else {
+          tasks.push(datamuse({rel_syn:q, md:'p'}, currentController));
+          tasks.push(datamuse({ml:q, md:'p'}, currentController));
+        }
+        const groups = await Promise.all(tasks);
+        if(token !== latestToken) return;
+
+        const seen = new Set();
+        const items = groups.flat().filter(it=>{
+          if(!it.word) return false;
+          const w = it.word.toLowerCase();
+          if(seen.has(w)) return false; seen.add(w); return true;
+        }).sort((a,b)=> (b.score||0)-(a.score||0)).slice(0,80);
+
+        showResults(items, q);
+      } catch(e){
+        if(e.name !== 'AbortError' && token === latestToken) {
+          console.error('Lookup error:', e);
+          results.textContent = `Error: ${e.message || 'Request failed'}`;
+        }
+      } finally {
+        if(token === latestToken) setBusy(false);
+      }
+    }
+
+    function showResults(items, q){
+      results.innerHTML = '';
+      if(!items.length){
+        results.innerHTML = '<div class="empty">No ideas found.</div>';
+        return;
+      }
+      for(const it of items){
+        const chip = document.createElement('button');
+        chip.className = 'chip';
+        chip.tabIndex = 0;
+        chip.setAttribute('role','listitem');
+        const pos = (it.tags||[]).find(t=>['n','v','adj','adv'].includes(t)) || '';
+        chip.innerHTML = `<span>${it.word}</span> <span class="meta">${it.score||''}</span> ${pos?`<span class="pos">${pos}</span>`:''}`;
+        chip.addEventListener('click',()=>{
+          preview.value = it.word;
+          replaceSelectionWord(q, it.word);
+        });
+        chip.addEventListener('keydown', (e) => {
+          if(e.key === 'Enter' || e.key === ' '){
+            e.preventDefault();
+            preview.value = it.word;
+            replaceSelectionWord(q, it.word);
+          }
+        });
+        results.appendChild(chip);
+      }
+    }
+
+    // Roving focus across chips
+    results.addEventListener('keydown', e=>{
+      const chips = [...results.querySelectorAll('.chip')];
+      const i = chips.indexOf(document.activeElement);
+      if(i>=0 && chips.length && (e.key==='ArrowRight'||e.key==='ArrowLeft')){
+        e.preventDefault();
+        const next = e.key==='ArrowRight' ? (i+1)%chips.length : (i-1+chips.length)%chips.length;
+        chips[next].focus();
+      }
+    });
+
+    function replaceSelectionWord(target, repl){
+      const v = editor.value; const pos = caretPosSafe(editor);
+      const {word, start, end} = currentFragment(v, pos);
+      const before = editor.value;
+
+      if(target && target.toLowerCase() !== (word||'').toLowerCase()){
+        // Unicode-safe global replace using unified WB
+        const flags = hasUnicodeSupport ? 'giu' : 'gi';
+        const re = new RegExp(`(^|${WB})(${escapeRegExp(target)})($|${WB})`, flags);
+        history.push(before);
+        if(history.length > MAX_HISTORY) history.shift();
+        document.getElementById('btnUndo').disabled=false;
+        editor.value = v.replace(re, (_, a, m, b) => `${a}${keepCase(m, repl)}${b}`);
+      } else {
+        history.push(before);
+        if(history.length > MAX_HISTORY) history.shift();
+        document.getElementById('btnUndo').disabled=false;
+        const left = v.slice(0,start); const right = v.slice(end);
+        editor.value = left + keepCase(word||target, repl) + right;
+        const newPos = (left + repl).length;
+        setCursor(newPos);
+      }
+      renderOverlay();
+    }
+
+    function keepCase(src, repl){
+      if(!src) return repl;
+      if(src === src.toUpperCase()) return repl.toUpperCase();
+      if(src[0] === src[0].toUpperCase()){
+        // TitleCase each word chunk separated by whitespace
+        const words = repl.split(/\s+/);
+        return words.map(w => /^[A-Za-z]/.test(w) ? (w[0].toUpperCase()+w.slice(1)) : w).join(' ');
+      }
+      return repl.toLowerCase();
+    }
+
+    function setCursor(i){ editor.focus(); editor.setSelectionRange(i,i); }
+
+    // Weak words flagger
+    document.getElementById('btnWeak').addEventListener('click', ()=>{
+      const v = editor.value;
+      let marked = v;
+
+      // Multi-word phrases first
+      for(const re of WEAK_MULTI) {
+        marked = marked.replace(re, m => `«${m}»`);
+      }
+
+      // Single words with unified boundaries + flag fallback
+      const singleWords = [...WEAK_SINGLE].map(escapeRegExp).join('|');
+      const flagsWW = hasUnicodeSupport ? 'giu' : 'gi';
+      marked = marked.replace(
+        new RegExp(`(^|${WB})(${singleWords})($|${WB})`, flagsWW),
+        (_, a, m, b) => `${a}«${m}»${b}`
+      );
+
+      history.push(v);
+      if(history.length > MAX_HISTORY) history.shift();
+      document.getElementById('btnUndo').disabled=false;
+      editor.value = marked;
+      renderOverlay();
+    });
+
+    document.getElementById('btnUndo').addEventListener('click', ()=>{
+      const prev = history.pop();
+      if(prev!=null){ editor.value = prev; renderOverlay(); }
+      if(history.length===0) document.getElementById('btnUndo').disabled=true;
+    });
+
+    // Live events with debounced lookup
+    function tick(){ 
+      renderOverlay(); 
+      debouncedAutoLookup();
+    }
+
+    function debouncedAutoLookup(){
+      if (composing) return;
+      if (lookupTimeout) clearTimeout(lookupTimeout);
+      lookupTimeout = setTimeout(autoLookup, 250);
+    }
+
+    // IME composition safety
+    editor.addEventListener('compositionstart', ()=> { composing = true; });
+    editor.addEventListener('compositionend', ()=> { composing = false; tick(); });
+
+    editor.addEventListener('input', tick);
+    editor.addEventListener('keyup', tick);
+    editor.addEventListener('mouseup', tick);
+
+    // Scroll sync
+    editor.addEventListener('scroll', ()=> {
+      overlay.scrollTop = editor.scrollTop;
+      overlay.scrollLeft = editor.scrollLeft;
+    });
+
+    // Overlay shouldn't intercept
+    overlay.style.pointerEvents = 'none';
+
+    function autoLookup(){
+      const v = editor.value;
+      const pos = caretPosSafe(editor);
+      const frag = currentFragment(v, pos).word;
+      const trimmed = (frag||'').trim();
+      wordInput.value = trimmed;
+      if (trimmed && trimmed.length >= 2) {
+        lookup(trimmed, /*fragMode*/ true);
+      } else {
+        results.innerHTML = '<div class="empty">Type to search…</div>';
+      }
+    }
+
+    // Keyboard navigation and shortcuts
+    wordInput.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') {
+        e.preventDefault();
+        const q = (wordInput.value||'').trim();
+        if(!q) return;
+        lookup(q, q.length<3);
+      } else if(e.key === 'Escape') {
+        wordInput.value = '';
+        results.innerHTML = '<div class="empty">Type to search…</div>';
+      }
+    });
+
+    preview.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') {
+        e.preventDefault();
+        const q = wordInput.value.trim();
+        const repl = preview.value.trim();
+        if(!q || !repl) return;
+        replaceSelectionWord(q, repl);
+      } else if(e.key === 'Escape') {
+        preview.value = '';
+      }
+    });
+
+    document.getElementById('lookup').addEventListener('click', ()=>{
+      const q = (wordInput.value||'').trim(); if(!q) return; lookup(q, q.length<3);
+    });
+    applyBtn.addEventListener('click', ()=>{
+      const q = wordInput.value.trim(); const repl = preview.value.trim();
+      if(!q || !repl) return; replaceSelectionWord(q, repl);
+    });
+
+    // Persist editor content to localStorage
+    editor.addEventListener('input', () => {
+      localStorage.setItem('tb_text', editor.value);
+    });
+
+    // Restore content from localStorage or use default
+    const savedText = localStorage.getItem('tb_text');
+    editor.value = savedText || "I am drafting an essay, but some parts feel very weak and kind of wordy. The live focus cursor should track my current sentence and suggest sharper words in real time.";
+    if(savedText) console.log('📝 Restored draft from localStorage');
+
+    // Auto-focus on load
+    window.addEventListener('load', () => editor.focus());
+
+    // Initial render and lookup
+    renderOverlay();
+    debouncedAutoLookup();
+  </script>
+</body>
+</html>
