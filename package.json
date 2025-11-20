@@ -1,0 +1,32 @@
+{
+  "name": "thesaurus-buddy",
+  "version": "2.0.0",
+  "description": "Intelligent writing assistant with live focus tracking, synonym suggestions, and weak word detection",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "writing",
+    "thesaurus",
+    "synonyms",
+    "editor",
+    "writing-assistant"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitest/ui": "^1.0.4",
+    "vite": "^5.0.0",
+    "vitest": "^1.0.4",
+    "@vitest/coverage-v8": "^1.0.4",
+    "jsdom": "^23.0.0"
+  }
+}

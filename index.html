@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Intelligent writing assistant with live focus tracking, synonym suggestions, and weak word detection" />
+  <title>Thesaurus Buddy — Live Focus Writing Assistant</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🧠 Thesaurus Buddy · Live-Focus Cursor</h1>
+      <div id="helper" class="hint">
+        Live-tracking fragments + context aura. Select a word or just type.
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Main Editor Panel -->
+      <section class="card" aria-label="Editor">
+        <h2>Essay (live focus)</h2>
+        <div class="editor-wrap">
+          <pre id="overlay" aria-hidden="true"></pre>
+          <textarea
+            id="editor"
+            spellcheck="false"
+            aria-label="Main text editor"
+            aria-describedby="helper"
+          ></textarea>
+        </div>
+        <div class="toolbar">
+          <button class="btn small" id="btnWeak" aria-label="Flag weak words in text">
+            Flag weak words
+          </button>
+          <button class="btn small" id="btnUndo" disabled aria-label="Undo last change">
+            Undo
+          </button>
+          <span class="halo">
+            <span class="dot" id="presenceDot" aria-hidden="true"></span>
+            <span class="hint">AI focus on current sentence</span>
+          </span>
+        </div>
+      </section>
+
+      <!-- Sidebar: Focus Intelligence Panel -->
+      <aside class="card" aria-label="Thesaurus and Focus Intelligence">
+        <h2>Focus Intelligence</h2>
+
+        <!-- Search Bar -->
+        <div class="search-bar">
+          <input
+            class="search-input"
+            id="word"
+            type="text"
+            autocomplete="off"
+            placeholder="Word/fragment (auto from cursor)…"
+            aria-label="Search word or fragment"
+            aria-describedby="helper"
+          />
+          <button class="btn" id="lookup" aria-label="Look up word">
+            Look up
+          </button>
+        </div>
+
+        <div class="panel">
+          <!-- KPI Tiles -->
+          <div class="kpi">
+            <div class="tile">
+              <h4>Fragment</h4>
+              <div class="v" id="kFrag" aria-live="polite">—</div>
+            </div>
+            <div class="tile">
+              <h4>POS guess</h4>
+              <div class="v" id="kPOS" aria-live="polite">—</div>
+            </div>
+            <div class="tile">
+              <h4>Sentence len</h4>
+              <div class="v" id="kLen" aria-live="polite">0</div>
+            </div>
+          </div>
+
+          <!-- Results Chips -->
+          <div class="chips" id="results" role="list" aria-live="polite">
+            <div class="empty">Type to search…</div>
+          </div>
+
+          <!-- Replacement Bar -->
+          <div class="replace-bar">
+            <input
+              id="preview"
+              type="text"
+              autocomplete="off"
+              placeholder="Replacement preview"
+              aria-label="Replacement preview"
+            />
+            <button class="btn" id="apply" aria-label="Apply replacement">
+              Apply
+            </button>
+          </div>
+
+          <!-- Footer Info -->
+          <div class="footer">
+            <strong>Thesaurus Buddy v2.0</strong> — Datamuse API + in-browser heuristics (no login).
+            Topic tags below are inferred locally using TF-IDF.
+          </div>
+
+          <!-- Topic Tags -->
+          <div class="chips" id="topics" aria-label="Document topics">
+            <span class="empty">Computing topics...</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Main Application Script -->
+  <script type="module" src="/src/index.js"></script>
+</body>
+</html>
